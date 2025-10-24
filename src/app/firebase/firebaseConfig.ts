@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCl_Ixu7awRhW59ETyhfK3TF7NFS559R5c",
+    apiKey: "",
     authDomain: "anggiprayoga-test.firebaseapp.com",
     projectId: "anggiprayoga-test",
     storageBucket: "anggiprayoga-test.firebasestorage.app",
