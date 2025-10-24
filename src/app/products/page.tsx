@@ -1,28 +1,29 @@
 "use client";
 
 import {
-    DeleteOutlined,
-    EditOutlined,
-    PlusOutlined,
-    SearchOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import {
-    Button,
-    Form,
-    Input,
-    InputNumber,
-    Modal,
-    Pagination,
-    Space,
-    Spin,
-    Typography,
-    message,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Pagination,
+  Space,
+  Spin,
+  Typography,
+  message,
 } from "antd";
 import Table, { ColumnsType } from "antd/es/table";
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Product } from "../type/product";
 import { debounce } from "../utils/debounce";
+import ProtectedRoute from "../utils/protectedProduct";
 
 export default function ProductsPage() {
   const { Title, Text } = Typography;
@@ -46,13 +47,22 @@ export default function ProductsPage() {
     setLoading(true);
     setError(null);
     try {
+      const token = localStorage.getItem("firebaseToken");
+      if (!token) {
+        console.error("Token is missing.");
+        setError("Authorization token is missing.");
+        return;
+      }
+
       const res = await axios.get("/api/products", {
         params: search ? { search } : {},
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const apiData = res.data?.data || [];
-      setProducts(apiData);
+
+      const data = Array.isArray(res.data?.data) ? res.data.data : [];
+      setProducts(data);
     } catch (err) {
-      console.error("Failed to fetch:", err);
+      console.error("Failed to fetch products:", err);
       setError("Failed to fetch products");
     } finally {
       setLoading(false);
@@ -210,110 +220,115 @@ export default function ProductsPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ textAlign: "center", padding: 50 }}>
-        <Title level={4} type="danger">
-          {error}
-        </Title>
-      </div>
-    );
-  }
+  // if (error) {
+  //   return (
+  //     <div style={{ textAlign: "center", padding: 50 }}>
+  //       <Title level={4} type="danger">
+  //         {error}
+  //       </Title>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div style={{ padding: 24 }}>
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <Title level={3}>Product List</Title>
+    <ProtectedRoute>
+      <div style={{ padding: 24 }}>
+        <Space direction="vertical" style={{ width: "100%" }} size="large">
+          <Title level={3}>Product List</Title>
 
-        <Space style={{ justifyContent: "space-between", width: "100%" }}>
-          <Search
-            placeholder="Search products..."
-            value={searchValue}
-            onChange={onSearchChange}
-            enterButton={<SearchOutlined />}
-            style={{ maxWidth: 300 }}
+          <Space style={{ justifyContent: "space-between", width: "100%" }}>
+            <Search
+              placeholder="Search products..."
+              value={searchValue}
+              onChange={onSearchChange}
+              enterButton={<SearchOutlined />}
+              style={{ maxWidth: 300 }}
+            />
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => openModal("create")}
+            >
+              Create Product
+            </Button>
+          </Space>
+
+          <Table
+            columns={columns}
+            dataSource={products.slice(
+              (currentPage - 1) * pageSize,
+              currentPage * pageSize
+            )}
+            rowKey="product_id"
+            pagination={false}
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openModal("create")}
-          >
-            Create Product
-          </Button>
+
+          <Pagination
+            total={products.length}
+            align="center"
+            pageSize={pageSize}
+            current={currentPage}
+            onChange={(page) => setCurrentPage(page)}
+            style={{ textAlign: "right" }}
+          />
         </Space>
 
-        <Table
-          columns={columns}
-          dataSource={products.slice(
-            (currentPage - 1) * pageSize,
-            currentPage * pageSize
-          )}
-          rowKey="product_id"
-          pagination={false}
-        />
+        {/* Modal Create / Edit */}
+        <Modal
+          title={modalType === "create" ? "Create Product" : "Edit Product"}
+          open={isModalOpen}
+          onCancel={handleCancel}
+          footer={null}
+        >
+          <Form layout="vertical" form={form}>
+            <Form.Item
+              label="Product Title"
+              name="product_title"
+              rules={[
+                { required: true, message: "Please input product title" },
+              ]}
+            >
+              <Input placeholder="Enter product title" />
+            </Form.Item>
 
-        <Pagination
-          total={products.length}
-          pageSize={pageSize}
-          current={currentPage}
-          onChange={(page) => setCurrentPage(page)}
-          style={{ textAlign: "right" }}
-        />
-      </Space>
+            <Form.Item
+              label="Price"
+              name="product_price"
+              rules={[
+                { required: true, message: "Please input product price" },
+                { type: "number", message: "Price must be a number" },
+              ]}
+            >
+              <InputNumber
+                placeholder="Enter price"
+                style={{ width: "100%" }}
+                min={0}
+              />
+            </Form.Item>
 
-      {/* Modal Create / Edit */}
-      <Modal
-        title={modalType === "create" ? "Create Product" : "Edit Product"}
-        open={isModalOpen}
-        onCancel={handleCancel}
-        footer={null}
-      >
-        <Form layout="vertical" form={form}>
-          <Form.Item
-            label="Product Title"
-            name="product_title"
-            rules={[{ required: true, message: "Please input product title" }]}
-          >
-            <Input placeholder="Enter product title" />
-          </Form.Item>
+            <Form.Item label="Description" name="product_description">
+              <Input.TextArea placeholder="Enter description" rows={3} />
+            </Form.Item>
 
-          <Form.Item
-            label="Price"
-            name="product_price"
-            rules={[
-              { required: true, message: "Please input product price" },
-              { type: "number", message: "Price must be a number" },
-            ]}
-          >
-            <InputNumber
-              placeholder="Enter price"
-              style={{ width: "100%" }}
-              min={0}
-            />
-          </Form.Item>
+            <Form.Item label="Category" name="product_category">
+              <Input placeholder="Enter category" />
+            </Form.Item>
 
-          <Form.Item label="Description" name="product_description">
-            <Input.TextArea placeholder="Enter description" rows={3} />
-          </Form.Item>
+            <Form.Item label="Image URL" name="product_image">
+              <Input placeholder="Enter image URL" />
+            </Form.Item>
 
-          <Form.Item label="Category" name="product_category">
-            <Input placeholder="Enter category" />
-          </Form.Item>
-
-          <Form.Item label="Image URL" name="product_image">
-            <Input placeholder="Enter image URL" />
-          </Form.Item>
-
-          <Form.Item>
-            <Space style={{ width: "100%", justifyContent: "end" }}>
-              <Button onClick={handleCancel}>Cancel</Button>
-              <Button type="primary" onClick={handleSubmit} loading={loading}>
-                {modalType === "create" ? "Create" : "Update"}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+            <Form.Item>
+              <Space style={{ width: "100%", justifyContent: "end" }}>
+                <Button onClick={handleCancel}>Cancel</Button>
+                <Button type="primary" onClick={handleSubmit} loading={loading}>
+                  {modalType === "create" ? "Create" : "Update"}
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    </ProtectedRoute>
   );
 }
